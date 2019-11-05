@@ -13,7 +13,6 @@ using namespace std;
  * @return
  */
 int main() {
-//    freopen( "log.txt", "w", stdout );
 
     Data ourData = Data();
     Preprocessing preprocessing = Preprocessing();
