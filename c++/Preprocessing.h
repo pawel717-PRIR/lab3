@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <cmath>
-#include <limits>
+#include <float.h>
 
 class Preprocessing
 {
