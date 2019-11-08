@@ -143,7 +143,7 @@ void Preprocessing::Standarization(float *data, int rows, int columns) {
     cuda_standarization<<<blocks_count, threads_count_per_block>>>(cuda_data, rows, columns);
     cudaEventRecord(stop);
 
-    // copy computed data to from gpu device memory to host RAM
+    // copy computed data from gpu device memory to host RAM
     HANDLE_ERROR(cudaMemcpy(data, cuda_data, data_size, cudaMemcpyDeviceToHost));
 
     // print elapsed time

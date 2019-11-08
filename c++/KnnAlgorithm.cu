@@ -6,14 +6,12 @@ static void HandleError( cudaError_t err, const char *file,  int line ) {
     }
 }
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
-
-__global__ void cuda_knn_predict(float *data, int train_rows, int test_rows, int columns) {
+//__device__ int * accurate_predictions = 0;
+__global__ void cuda_knn_predict(float *data, int train_rows, int test_rows, int columns, int * accurate_predictions) {
     int total_threads_count = blockDim.x * gridDim.x;
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
     int closest_neighbour_index;
-    int accurate_predictions = 0;
-
     float max_float = FLT_MAX;
     float* train_data = data;
     float* test_data = data + (columns * train_rows);
@@ -41,9 +39,11 @@ __global__ void cuda_knn_predict(float *data, int train_rows, int test_rows, int
         // so let's get target class of that neighbour (predicted class) and check if the prediction is accurate
         if(*(test_data + (current_test_row * columns)) == *(train_data + (closest_neighbour_index * columns))) {
             // if prediction is accurate increment accurate predictions counter
-            accurate_predictions = accurate_predictions + 1;
+            //atomicAdd(accurate_predictions, 1);
+            accurate_predictions[tid] = 1;
+        } else {
+            accurate_predictions[tid] = 0;
         }
-        printf("tid:%d accurate_predictions %d\n", tid, accurate_predictions);
     }
 }
 
@@ -64,7 +64,9 @@ void KnnAlgorithm::fit(Data * data, int percent) {
 }
 
 float KnnAlgorithm::predict() {
-    int accurate_predictions = 0;
+    int* accurate_predictions;
+    int* cuda_accurate_predictions;
+
 
     cudaDeviceProp cuda_properties; // information about gpu
     HANDLE_ERROR(cudaGetDeviceProperties( &cuda_properties, 0));
@@ -83,6 +85,7 @@ float KnnAlgorithm::predict() {
     int data_size = sizeof(float) * (this->test_rows + this->train_rows) * this->columns;
     HANDLE_ERROR(cudaMalloc((void**)&cuda_data, data_size));
     HANDLE_ERROR(cudaMemcpy(cuda_data, this->train_data, data_size, cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMalloc((void**)&cuda_accurate_predictions, blocks_count*threads_count_per_block* sizeof(int)));
 
     // measure time using cuda events
     cudaEvent_t start, stop;
@@ -90,7 +93,7 @@ float KnnAlgorithm::predict() {
     cudaEventCreate(&stop);
     cudaEventRecord(start);
     // perform knn prediction
-    cuda_knn_predict<<<blocks_count, threads_count_per_block>>>(cuda_data, this->train_rows, this->test_rows, this->columns);
+    cuda_knn_predict<<<blocks_count, threads_count_per_block>>>(cuda_data, this->train_rows, this->test_rows, this->columns, cuda_accurate_predictions);
     cudaEventRecord(stop);
 
     // print elapsed time
@@ -101,5 +104,16 @@ float KnnAlgorithm::predict() {
     cudaEventDestroy(stop);
     printf("Czas obliczen knn: %f\n", elapsed_time/1000);
 
-    return (accurate_predictions / float(test_rows)) * 100;
+    // copy from gpu device memory to host RAM
+    //int* cuda_acc = NULL;
+   // HANDLE_ERROR(cudaMemcpyFromSymbol((void**)&cuda_acc, "accurate_predictions", sizeof(cuda_acc), 0, cudaMemcpyDeviceToHost));
+    accurate_predictions = (int*) malloc (blocks_count*threads_count_per_block * sizeof(int));
+    HANDLE_ERROR(cudaMemcpy(accurate_predictions, cuda_accurate_predictions, sizeof(int) * blocks_count*threads_count_per_block,
+            cudaMemcpyDeviceToHost));
+    int sum = 0;
+    for (int i=0; i<blocks_count*threads_count_per_block; i++) {
+        sum += *(accurate_predictions+i);
+    }
+
+    return (sum / float(test_rows)) * 100;
 }

@@ -22,7 +22,7 @@ int main() {
     preprocessing.Standarization(ourData.data, ourData.rows, ourData.columns);
     knn.fit(&ourData, 75);
     float accuracy = knn.predict();
-    //printf("Accuracy knn: %f\n", accuracy);
+    printf("Accuracy knn: %f\n", accuracy);
 
 	return 0;
 }
