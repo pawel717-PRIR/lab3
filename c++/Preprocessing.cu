@@ -74,18 +74,10 @@ Preprocessing::Preprocessing() {
 Preprocessing::~Preprocessing() {
 }
 
-void Preprocessing::Normalization(float *data, int rows, int columns) {
+void Preprocessing::Normalization(float *data, int rows, int columns,
+        int threads_count_per_block, int blocks_count) {
     cudaDeviceProp cuda_properties; // information about gpu
     HANDLE_ERROR(cudaGetDeviceProperties( &cuda_properties, 0));
-    int threads_count_per_block = cuda_properties.maxThreadsPerBlock; // use as many threads as possible on this device
-    if(threads_count_per_block > columns) {
-        threads_count_per_block = columns;
-    }
-    int blocks_count = (columns + threads_count_per_block - 1) / threads_count_per_block;
-    int max_blocks_count = cuda_properties.maxGridSize[0];
-    if(blocks_count > max_blocks_count) {
-        blocks_count = max_blocks_count;
-    }
 
     // copy data to compute from RAM into gpu device memory
     float *cuda_data;
@@ -115,18 +107,10 @@ void Preprocessing::Normalization(float *data, int rows, int columns) {
 }
 
 
-void Preprocessing::Standarization(float *data, int rows, int columns) {
+void Preprocessing::Standarization(float *data, int rows, int columns,
+        int threads_count_per_block, int blocks_count) {
     cudaDeviceProp cuda_properties; // information about gpu
     HANDLE_ERROR(cudaGetDeviceProperties( &cuda_properties, 0));
-    int threads_count_per_block = cuda_properties.maxThreadsPerBlock; // use as many threads as possible on this device
-    if(threads_count_per_block > columns) {
-        threads_count_per_block = columns;
-    }
-    int blocks_count = (columns + threads_count_per_block - 1) / threads_count_per_block;
-    int max_blocks_count = cuda_properties.maxGridSize[0];
-    if(blocks_count > max_blocks_count) {
-        blocks_count = max_blocks_count;
-    }
 
     // copy data to compute into gpu device memory
     float *cuda_data;

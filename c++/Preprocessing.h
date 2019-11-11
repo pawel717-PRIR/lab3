@@ -9,7 +9,7 @@ class Preprocessing
 public:
 	Preprocessing();
 	~Preprocessing();
-    void Normalization(float *data, int rows, int columns);
-	void Standarization(float *data, int rows, int columns);
+    void Normalization(float *data, int rows, int columns, int threads_count_per_block, int blocks_count);
+	void Standarization(float *data, int rows, int columns, int threads_count_per_block, int blocks_count);
 };
 
