@@ -1,5 +1,4 @@
 #include "Preprocessing.h"
-#include <float.h>
 static void HandleError( cudaError_t err, const char *file,  int line ) {
     if (err != cudaSuccess) {
         printf( "%s in %s at line %d\n", cudaGetErrorString( err ),  file, line );
@@ -75,20 +74,12 @@ Preprocessing::Preprocessing() {
 Preprocessing::~Preprocessing() {
 }
 
-void Preprocessing::Normalization(float *data, int rows, int columns) {
+void Preprocessing::Normalization(float *data, int rows, int columns,
+        int threads_count_per_block, int blocks_count) {
     cudaDeviceProp cuda_properties; // information about gpu
     HANDLE_ERROR(cudaGetDeviceProperties( &cuda_properties, 0));
-    int threads_count_per_block = cuda_properties.maxThreadsPerBlock; // use as many threads as possible on this device
-    if(threads_count_per_block > columns) {
-        threads_count_per_block = columns;
-    }
-    int blocks_count = (columns + threads_count_per_block - 1) / threads_count_per_block;
-    int max_blocks_count = cuda_properties.maxGridSize[0];
-    if(blocks_count > max_blocks_count) {
-        blocks_count = max_blocks_count;
-    }
 
-    // copy data to compute into gpu device memory
+    // copy data to compute from RAM into gpu device memory
     float *cuda_data;
     int data_size = sizeof(float) * rows * columns;
     HANDLE_ERROR(cudaMalloc((void**)&cuda_data, data_size));
@@ -99,11 +90,11 @@ void Preprocessing::Normalization(float *data, int rows, int columns) {
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-    // normalize
+    // standarize
     cuda_normalization<<<blocks_count, threads_count_per_block>>>(cuda_data, rows, columns);
     cudaEventRecord(stop);
 
-    // copy computed data to from gpu device memory to host RAM
+    // copy computed data from gpu device memory to host RAM
     HANDLE_ERROR(cudaMemcpy(data, cuda_data, data_size, cudaMemcpyDeviceToHost));
 
     // print elapsed time
@@ -116,18 +107,10 @@ void Preprocessing::Normalization(float *data, int rows, int columns) {
 }
 
 
-void Preprocessing::Standarization(float *data, int rows, int columns) {
+void Preprocessing::Standarization(float *data, int rows, int columns,
+        int threads_count_per_block, int blocks_count) {
     cudaDeviceProp cuda_properties; // information about gpu
     HANDLE_ERROR(cudaGetDeviceProperties( &cuda_properties, 0));
-    int threads_count_per_block = cuda_properties.maxThreadsPerBlock; // use as many threads as possible on this device
-    if(threads_count_per_block > columns) {
-        threads_count_per_block = columns;
-    }
-    int blocks_count = (columns + threads_count_per_block - 1) / threads_count_per_block;
-    int max_blocks_count = cuda_properties.maxGridSize[0];
-    if(blocks_count > max_blocks_count) {
-        blocks_count = max_blocks_count;
-    }
 
     // copy data to compute into gpu device memory
     float *cuda_data;
@@ -140,11 +123,11 @@ void Preprocessing::Standarization(float *data, int rows, int columns) {
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-    // normalize
+    // standarize
     cuda_standarization<<<blocks_count, threads_count_per_block>>>(cuda_data, rows, columns);
     cudaEventRecord(stop);
 
-    // copy computed data to from gpu device memory to host RAM
+    // copy computed data from gpu device memory to host RAM
     HANDLE_ERROR(cudaMemcpy(data, cuda_data, data_size, cudaMemcpyDeviceToHost));
 
     // print elapsed time
