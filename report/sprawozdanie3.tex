@@ -1,0 +1,358 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{pgfplots}
+\selectlanguage{polish}
+\usepackage{geometry}
+\usepackage{listings}
+\newgeometry{tmargin=3cm, bmargin=3cm, lmargin=2.5cm, rmargin=2.5cm}
+\title{
+	\textbf{Programowanie równoległe i rozproszone}\vspace{40pt}
+	\\\textit{Politechnika Krakowska} \\\vspace{40pt}
+	Laboratorium 3
+	\vspace{300pt}
+
+}
+\author{
+	Paweł Suchanicz,\\
+	Rafał Niemczyk
+}
+\begin{document}
+\begin{titlepage}
+\maketitle
+\end{titlepage}
+
+\begin{center}
+\tableofcontents
+\end{center}
+\newpage
+\section{Wstęp}
+\subsection{Opis laboratorium}
+\paragraph{}Celem laboratorium było wykorzystanie CUDA do zrównoleglenia kodu C++. CUDA (Compute Unified Device Architecture) to architektura kart graficznych opracowana przez firmę Nvidia. Pozwala wykorzystanie mocy obliczeniowej kart graficznych w programach opartych o język C/C++.
+\paragraph{}Algorytmy, które są implementowane a następnie zrównoleglane w ramach laboratorium to normalizacja min-max, standaryzacja rozkładem normalnym i klasyfikacja KNN (k-najbliższych sąsiadów). Zaimplementowany KNN  uwzględnia jednego sąsiada i używa metryki euklidesowej.
+\paragraph{}Szybkość działania każdego algorytmu została zmierzona dla implementacji sekwencyjnej w C++, implementacji równoległej w C++ z wykorzystaniem CUDA dla różnej ilości wątków na blok oraz implementacji w Python (ze skorzystaniem z funkcji z pakietu scikit-learn).
+\subsection{Specyfikacja sprzętowa}
+\paragraph{}Przy pomiarach szybkości wykonywania algorytmów wykorzystany był sprzęt w konfiguracji 
+- do implementacji z wykorzystaniem CUDA:
+\\Serwer obliczeniowy cuda.iti.pk.edu
+\begin{itemize}
+\item Procesor: Intel Core i7-950 4 x 3.06GHz
+\item Ram: 23GB DDR3
+\item GPU: GeForce RTX 2080 Ti
+\item System: Ubuntu 18.04.3 LTS
+\end{itemize}
+- do implementacji w Python:
+\begin{itemize}
+\item Procesor: Intel Core i7-4712MQ 4 x 2.30GHz
+\item Ram: 8GB DDR3
+\item System: Fedora 22
+\
+\end{itemize}
+\subsection{Zbiór danych} 
+\paragraph{}Wykorzystany został zbiór obrazów ręcznie pisanych cyfr MNIST. Zbiór danych ma format .csv i zawiera 60000 rekordów, gdzie każdy rekord odpowiada za jeden obrazek 28x28 pikseli w skali szarości. Pierwsza wartość w rekordzie jest cyfrą która widnieje na obrazku, a kolejne to wartości pikseli obrazka. 
+\paragraph{}
+Dla zadań postawionych w laboratorium zbiór danych jest dość duży, więc został on obcięty do pierwszych 6000 rekordów, z czego 4500 przeznaczono do trenowania, a pozostałe 1500 do testowania.
+\newpage    
+\section{Wyniki}   
+\subsection{Normalizacja min-max} 
+\paragraph{}Wzór:
+\paragraph{}$x^*=\frac{x-min(x)}{max(x)-min(x)}$
+\subsubsection{Implementacja} 
+\paragraph{}W C++ normalizacja została samodzielnie zgodnie z podanym powyżej wzorem. W pętli przechodzącej tablicy (po kolumnach) wyszukiwane są wartości minimum i maxium dla każdej kolumny a następnie wyliczana nowa wartość dla każdego z elementów tablicy. W implementacji CUDA ustalono ilość bloków równą 16 i mierzono czasu dla różnych ilości wątków na blok.
+
+\paragraph{}W Pythonie użyta została funkcja MinMaxScaler z pakietu sklearn .
+\subsubsection{Porównanie wyników} 
+\paragraph{}
+\begin{tabular}{|c|c|}
+\hline Parametry&Czas [s] \\ 
+\hline C++ & 0.101 \\
+\hline C++ CUDA 1 wątek& 0.127 \\
+\hline C++ CUDA 2 wątki& 0.070 \\
+\hline C++ CUDA 3 wątki& 0.050 \\
+\hline C++ CUDA 4 wątki& 0.039 \\
+\hline C++ CUDA 8 wątków& 0.023 \\
+\hline C++ CUDA 16 wątków& 0.013 \\
+\hline C++ CUDA 32 wątków& 0.008 \\
+\hline C++ CUDA 64 wątków& 0.004 \\
+\hline C++ CUDA 128 wątków& 0.004 \\
+\hline
+\hline Pyhon sklearn& 0.037 \\
+\hline
+\end{tabular}
+\paragraph{}
+Zastosowanie CUDA i zwiększanie ilości wątków powodowało spadek czasów wykonania. Czasy spadają  gdy liczba procesów do pewnego momentu (około 60 wątków). Ograniczeniem jest tu wielkość tablicy z danymi która jest zrównoleglana - ze względu na sposób implementacji zwiększanie liczby wątków na blok ma efekt tylko jeżeli całkowita liczba wątków nie jest większa niż wielkość tablicy. Udało się uzyskać czas wykonania mniejszy niż w implementacji sklearn o ponad 1 rząd wielkości.
+\\
+\begin{tikzpicture}[scale=1.5]
+\begin{axis}[
+title={Zależność czasu od ilości wątków - normalizacja},
+title style={text width=16em},
+xlabel={Ilość wątków},
+ylabel={Czas [s]},
+xmin=0,xmax=130,
+ymin=0,ymax=0.13,
+legend pos=north east,
+ymajorgrids=true,grid style=dashed
+]
+\addplot[color=red,mark=*]
+coordinates {
+(1,0.127)
+(2,0.070)
+(3,0.050)
+(4,0.039)
+(8,0.023)
+(16,0.013)
+(32,0.008)
+(64,0.004)
+(128,0.004)
+};
+
+\legend{C++}
+\end{axis}
+\end{tikzpicture}
+\paragraph{}
+\begin{tikzpicture}[scale=1.5]
+\begin{axis}[
+title={Zależność przyspieszenia od ilości wątków - normalizacja},
+title style={text width=16em},
+xlabel={Ilość wątków},
+ylabel={Przyspieszenie},
+xmin=0,xmax=130,
+ymin=-0.04,ymax=0.13,
+legend pos=north east,
+ymajorgrids=true,grid style=dashed
+]
+\addplot[color=red,mark=*]
+coordinates {
+(1,-0.026)
+(2,0.031)
+(3,0.051)
+(4,0.062)
+(8,0.078)
+(16,0.088)
+(32,0.093)
+(64,0.097)
+(128,0.097)
+};
+
+\legend{C++}
+\end{axis}
+\end{tikzpicture}
+\newpage
+
+\subsection{Standaryzacja rozkładem normalnym} 
+\paragraph{} Wzór:
+\paragraph{}$x^*=\frac{x-\mu}{\sigma}$
+\subsubsection{Implementacja} 
+\paragraph{}W C++ standaryzacja została zaimplementowana samodzielnie zgodnie z podanym powyżej wzorem. Przechodzimy w pętli po kolumnach i dla każdej kolumny szukamy wartości średniej i wariancji, a następnie wyliczamy nowe wartości dla każdego elementu tablicy. W implementacji CUDA ustalono ilość bloków równą 16 i mierzono czasu dla różnych ilości wątków na blok.
+
+\paragraph{}W Pythonie użyta została funkcja StandardScaler z pakietu sklearn.
+
+\subsubsection{Porównanie wyników} 
+
+\paragraph{}
+\begin{tabular}{|c|c|}
+\hline Parametry&Czas [s] \\
+\hline C++ & 0.157 \\
+\hline C++ CUDA 1 wątek& 0.079 \\
+\hline C++ CUDA 2 wątki& 0.049 \\
+\hline C++ CUDA 3 wątki& 0.034 \\
+\hline C++ CUDA 4 wątki& 0.031 \\
+\hline C++ CUDA 8 wątków& 0.022 \\
+\hline C++ CUDA 16 wątków& 0.015 \\
+\hline C++ CUDA 32 wątków& 0.011 \\
+\hline C++ CUDA 64 wątków& 0.006 \\
+\hline C++ CUDA 128 wątków& 0.006 \\
+\hline
+\hline Pyhon sklearn& 0.086 \\
+\hline
+\end{tabular}
+\paragraph{}
+W przypadku standaryzacji samo użycie CUDA spowodowało już przyspieszenie o 49\% w stosunku do implementacji sekwencyjnej. Zwiększanie ilości wątków do pewnego momentu granicznego (około 60) powodowało spadek czasu wykonania. Udało się uzyskać czas wykonania mniejszy niż w implementacji sklearn o ponad 1 rząd wielkości.
+
+\begin{tikzpicture}[scale=1.5]
+\begin{axis}[
+title={Zależność czasu od ilości wątków - standaryzacja},
+title style={text width=16em},
+xlabel={Ilość wątków},
+ylabel={Czas [s]},
+xmin=0,xmax=130,
+ymin=0,ymax=0.09,
+legend pos=north east,
+ymajorgrids=true,grid style=dashed
+]
+\addplot[color=red,mark=*]
+coordinates {
+(1,0.079)
+(2,0.049)
+(3,0.034)
+(4,0.031)
+(8,0.022)
+(16,0.015)
+(32,0.011)
+(64,0.006)
+(128,0.006)
+};
+
+\legend{C++}
+\end{axis}
+\end{tikzpicture}
+\paragraph{}
+\begin{tikzpicture}[scale=1.5]
+\begin{axis}[
+title={Zależność przyspieszenia od ilości wątków - standaryzacja},
+title style={text width=16em},
+xlabel={Ilość wątków},
+ylabel={Przyspieszenie},
+xmin=0,xmax=130,
+ymin=0.07,ymax=0.18,
+legend pos=north east,
+ymajorgrids=true,grid style=dashed
+]
+
+\addplot[color=red,mark=*]
+coordinates {
+(1,0.078)
+(2,0.108)
+(3,0.123)
+(4,0.126)
+(8,0.135)
+(16,0.142)
+(32,0.146)
+(64,0.151)
+(128,0.151)
+};
+
+\legend{C++}
+\end{axis}
+\end{tikzpicture}
+\newpage
+\subsection{Klasyfikacja KNN} 
+\subsubsection{Implementacja} 
+\paragraph{}W C++ algorytm k najbliższych sąsiadów zaimplementowany samodzielnie. Algorytm uwzględnia tylko najbliższego sąsiada i korzysta z metryki euklidesowej.
+W implementacji CUDA ustalono ilość bloków równą 16 i mierzono czasu dla różnych ilości wątków na blok.
+
+\paragraph{}W Pythonie użyta została funkcja KNeighborsClassifier z pakietu sklearn z parametrami:
+\begin{lstlisting}
+KNeighborsClassifier(n_neighbors=1, algorithm='brute', p=2, metric='minkowski',
+n_jobs=app_conf['jobs_number'])
+\end{lstlisting}
+Czasy były mierzone dla wartości njobs od 1 do 4. \\
+Dokładność accuracy wyniosła 71\% dla danych po standard scalerze oraz 66\% dla danych po min-max scalarze.  
+W przypadku normalizacji w c++ otrzymano dokładność 93.67\%. W przypadku standaryzacji dokładność wyniosła 90\%.
+Użycie równoległości oczywiście nie miało wpływu na dokładność działania Knn.
+\subsubsection{Porównanie wyników} 
+\paragraph{}
+\begin{tabular}{|c|c|}
+\hline Parametry&Czas [s] \\ 
+\hline C++ CUDA 1 wątek normalizacja& 7.341 \\
+\hline C++ CUDA 2 wątki normalizacja& 3.612 \\
+\hline C++ CUDA 3 wątki normalizacja& 2.435  \\
+\hline C++ CUDA 4 wątki normalizacja& 1.813 \\
+\hline C++ CUDA 8 wątków normalizacja& 0.934 \\
+\hline C++ CUDA 16 wątków normalizacja& 0.514 \\
+\hline C++ CUDA 32 wątki normalizacja& 0.329  \\
+\hline C++ CUDA 64 wątki normalizacja& 0.275 \\
+\hline C++ CUDA 128 wątków normalizacja& 
+0.273 \\\hline
+\hline Pyhon sklearn njobs=1 normalizacja& 0.215 \\
+\hline Pyhon sklearn njobs=2 normalizacja& 0.323 \\
+\hline Pyhon sklearn njobs=3 normalizacja& 0.455 \\
+\hline Pyhon sklearn njobs=4 normalizacja& 0.386 \\\hline
+\hline C++ CUDA 1 wątek standaryzacja& 6.939 \\
+\hline C++ CUDA 2 wątki standaryzacja& 3.470 \\
+\hline C++ CUDA 3 wątki standaryzacja& 2.380  \\
+\hline C++ CUDA 4 wątki standaryzacja& 1.814 \\
+\hline C++ CUDA 8 wątków standaryzacja& 0.927 \\
+\hline C++ CUDA 16 wątków standaryzacja& 0.538 \\
+\hline C++ CUDA 32 wątki standaryzacja& 0.342  \\
+\hline C++ CUDA 64 wątki standaryzacja& 0.291 \\
+\hline C++ CUDA 128 wątków standaryzacja& 0.280 \\
+\hline
+\hline Pyhon sklearn 1 wątek standaryzacja& 0.208 \\
+\hline Pyhon sklearn 2 wątki standaryzacja& 0.326 \\
+\hline Pyhon sklearn 3 wątki standaryzacja& 0.329 \\
+\hline Pyhon sklearn 4 wątki standaryzacja& 0.328 \\\hline
+\end{tabular}
+\paragraph{}
+Użycie CUDA w c++ przyniosło pozytywny skutek. Wyniki były niemal identyczne dla danych po normalizacji jak i standaryzacji. Już przy użyciu dwóch wątków czas zmniejszył się około dwukrotnie, przy użyciu 4 wątków około czterokrotnie. Pomiędzy czasem dla 64 i 128 wątków na blok nie widać już dużej różnicy w czasie wykonania. Program był wykonywany dla 16 bloków, a zrównoleglaniu podlegała tablica o 1500 rekordach więc już 94 wątki dawały maksymalne przyspieszenie. Udało się osiągnąć czas zbliżony do implementacji w Pythonie. Podczas testów można było zauważyć, że lepsze przyspieszenie daje zwiększanie liczby bloków niż wątków.
+W przypadku Python zwiększanie parametru njobs algorytmu KNN przynosiło odwrotny skutek do oczekiwanego - czas wykonania wydłużał się.
+\paragraph{}
+\begin{tikzpicture}[scale=1.5]
+\begin{axis}[
+title={Zależność czasu od ilości wątków - knn},
+title style={text width=16em},
+xlabel={Ilość wątków},
+ylabel={Czas [s]},
+xmin=0,xmax=130,
+ymin=0,ymax=8,
+legend pos=north east,
+ymajorgrids=true,grid style=dashed
+]
+\addplot[color=red,mark=*]
+coordinates {
+(1,7.341)
+(2,3.612)
+(3,2.435)
+(4,1.813)
+(8,0.934)
+(16,0.514)
+(32,0.329)
+(64,0.275)
+(128,0.273)
+};
+
+\addplot[color=green,mark=o]
+coordinates {
+(1,6.939)
+(2,3.470)
+(3,2.380)
+(4,1.814)
+(8,0.927)
+(16,0.538)
+(32,0.342)
+(64,0.291)
+(128,0.280)
+};
+
+\legend{C++ normalizacja, C++ standardyzacja}
+\end{axis}
+\end{tikzpicture}
+
+\paragraph{}
+\begin{tikzpicture}[scale=1.5]
+\begin{axis}[
+title={Zależność czasu od parametru njobs - knn},
+title style={text width=16em},
+xlabel={njobs},
+ylabel={Czas [s]},
+xmin=0,xmax=5,
+ymin=0.15,ymax=0.56,
+legend pos=north east,
+ymajorgrids=true,grid style=dashed
+]
+
+\addplot[color=blue,mark=square]
+coordinates {
+(1,0.215)
+(2,0.323)
+(3,0.455)
+(4,0.386)
+
+};
+
+\addplot[color=orange,mark=square*]
+coordinates {
+(1,0.208)
+(2,0.326)
+(3,0.329)
+(4,0.328)
+
+};
+
+\legend{Python min-max, Python standard scaler}
+\end{axis}
+\end{tikzpicture}
+ 
+\end{document}
